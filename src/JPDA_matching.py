@@ -104,4 +104,3 @@ class Matcher:
         self.matches, _, _ = min_marg_matching(self.marginalizations,
                                                self.confirmed_tracks,
                                                self.assignment_threshold)
-                               

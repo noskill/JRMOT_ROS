@@ -1,7 +1,7 @@
 import os, pdb
 import numpy as np
 import tensorflow as tf
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import configparser
 
 import featurepointnet_tf_util as tf_util
@@ -21,21 +21,21 @@ class FPointNet():
             pointclouds_pl, one_hot_vec_pl, labels_pl, centers_pl, \
             heading_class_label_pl, heading_residual_label_pl, \
             size_class_label_pl, size_residual_label_pl = model_util.placeholder_inputs(batch_size, self.num_point)
-            is_training_pl = tf.placeholder(tf.bool, shape=())
+            is_training_pl = tf.compat.v1.placeholder(tf.bool, shape=())
             end_points, depth_feature = self.get_model(pointclouds_pl, one_hot_vec_pl, is_training_pl)
-            self.object_pointcloud = tf.placeholder(tf.float32, shape=(None, None, 3))
+            self.object_pointcloud = tf.compat.v1.placeholder(tf.float32, shape=(None, None, 3))
             #depth_feature = self.get_depth_feature_op(is_training_pl)
             loss = model_util.get_loss(labels_pl, centers_pl, heading_class_label_pl, heading_residual_label_pl, size_class_label_pl, size_residual_label_pl, end_points)
-            self.saver = tf.train.Saver()
+            self.saver = tf.compat.v1.train.Saver()
 
         # Create a session
-        config = tf.ConfigProto()
+        config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
-        self.sess = tf.Session(config=config)
+        self.sess = tf.compat.v1.Session(config=config)
 
         #Initialize variables
-        self.sess.run(tf.global_variables_initializer())
+        self.sess.run(tf.compat.v1.global_variables_initializer())
         # Restore variables from disk.
         self.saver.restore(self.sess, self.model_path)
         self.ops = {'pointclouds_pl': pointclouds_pl,
@@ -138,7 +138,7 @@ class FPointNet():
             logits: TF tensor in shape (B,N,2), scores for bkg/clutter and object
             end_points: dict
         '''
-        num_point = point_cloud.get_shape()[1].value
+        num_point = point_cloud.get_shape()[1]
 
         net = tf.expand_dims(point_cloud, 2)
 
@@ -206,7 +206,7 @@ class FPointNet():
                 including box centers, heading bin class scores and residuals,
                 and size cluster scores and residuals
         ''' 
-        num_point = object_point_cloud.get_shape()[1].value
+        num_point = object_point_cloud.get_shape()[1]
         net = tf.expand_dims(object_point_cloud, 2)
         net = tf_util.conv2d(net, 128, [1,1],
                              padding='VALID', stride=[1,1],
@@ -225,7 +225,7 @@ class FPointNet():
                              bn=True, is_training=is_training,
                              scope='conv-reg4', bn_decay=bn_decay)
 
-        features = tf.reduce_max(net, axis = 1)
+        features = tf.reduce_max(input_tensor=net, axis = 1)
 
         net = tf_util.max_pool2d(net, [num_point,1],
             padding='VALID', scope='maxpool2')
@@ -310,7 +310,7 @@ class FPointNet():
                              padding='VALID', stride=[1,1],
                              bn=True, is_training=is_training,
                              scope='conv-reg4', bn_decay=None)
-        net = tf.reduce_max(net, axis = 1)
+        net = tf.reduce_max(input_tensor=net, axis = 1)
         
         return net
 
