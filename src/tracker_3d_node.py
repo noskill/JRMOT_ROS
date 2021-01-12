@@ -23,9 +23,12 @@ from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import Int8
 from geometry_msgs.msg import Pose, PoseWithCovariance
 from spencer_tracking_msgs.msg import TrackedPerson, TrackedPersons
+import numpy
 
-import pdb
 
+class SimpleCallib():
+    def __init__(self, P):
+        self.P = P
 
 class Tracker_3D_node:
     def __init__(self):
@@ -36,11 +39,15 @@ class Tracker_3D_node:
 
         self.depth_weight = float(rospy.get_param('~combination_depth_weight', 1))
         calibration_folder = rospy.get_param('~calib_3d', 'src/jpda_rospack/calib/')
-        calib = OmniCalibration(calibration_folder)
+        ar = numpy.asarray([615.5032348632812, 0.0, 324.37359619140625, 0.0, 0.0, 615.6376953125, 240.253173828125, 0.0, 0.0, 0.0, 1.0, 0.0])
+        P = ar.reshape((3,4))
+
+        #calib = OmniCalibration(calibration_folder)
+        calib = SimpleCallib(P)
         self.tracker = Tracker_3d(max_age=25, n_init=3,
                                   JPDA=True, m_best_sol=10, assn_thresh=0.6,
                                   matching_strategy='hungarian',
-                                  cuda=True, calib=calib, omni=True,
+                                  cuda=True, calib=calib, omni=False,
                                   kf_vel_params=(0.08, 0.03, 0.01, 0.03,
                                                  1.2, 3.9, 0.8, 1.6),
                                   dummy_node_cost_iou=0.9, dummy_node_cost_app=6,
@@ -58,13 +65,16 @@ class Tracker_3D_node:
             self.combination_model.eval()
         else:
             self.combination_model = None
-        
+        _2d_bbox_features_topic = rospy.get_param("2d_bbox_features_topic", 
+                "detection2d_with_feature") 
+        _3d_bbox_topic = rospy.get_param("3d_bbox_features_topic",
+               "detection3d_with_feature")
         self.detection_2d_sub = \
-            message_filters.Subscriber("detection2d_with_feature",
+            message_filters.Subscriber(_2d_bbox_features_topic,
                                        detection2d_with_feature_array,
                                        queue_size=5)
         self.detection_3d_sub = \
-            message_filters.Subscriber("detection3d_with_feature",
+            message_filters.Subscriber(_3d_bbox_topic,
                                        detection3d_with_feature_array,
                                        queue_size=5)
         
@@ -74,7 +84,7 @@ class Tracker_3D_node:
         # self.last_seen_3d = 0
         self.time_sync = \
             message_filters.TimeSynchronizer([self.detection_2d_sub,
-                                                         self.detection_3d_sub],
+                                              self.detection_3d_sub],
                                                         5)
         self.time_sync.registerCallback(self.do_3d_tracking)
     

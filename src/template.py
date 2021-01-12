@@ -16,23 +16,36 @@ from cv_bridge import CvBridge, CvBridgeError
 from aligned_reid_utils import get_image_patches, generate_features, create_appearance_model
 from jpda_rospack.msg import detection2d_with_feature_array, detection2d_with_feature
 
+
+cuda = torch.cuda.is_available()
+device = 'cpu'
+if cuda:
+    device = 'cuda'
+
 class Appearance_Features:
     def __init__(self):
+
         self.node_name = "aligned_reid_feature_generator"
         
         rospy.init_node(self.node_name)
         rospy.on_shutdown(self.cleanup)
         apperance_model_ckpt = rospy.get_param('~aligned_reid_model', 'src/jpda_rospack/src/aligned_reid_MOT_weights.pth')
-        self.appearance_model = create_appearance_model(apperance_model_ckpt)
+        apperance_model_ckpt = './src/aligned_reid_JRDB_weights.pth'
+        raw_image_topic = rospy.get_param("raw_image_topic", "/ros_indigosdk_node/stitched_image0")
+        _2d_bbox_topic = rospy.get_param("2d_bbox_topic", '/omni_yolo_bboxes')
+        _2d_bbox_features_topic = rospy.get_param("2d_bbox_features_topic",
+                "detection2d_with_feature")
+        self.appearance_model = create_appearance_model(apperance_model_ckpt, cuda=cuda)
         
-        self.image_sub = message_filters.Subscriber("/ros_indigosdk_node/stitched_image0", Image, queue_size=2)
-        self.yolo_bbox_sub = message_filters.Subscriber("/omni_yolo_bboxes", BoundingBoxes, queue_size=2)
+        self.image_sub = message_filters.Subscriber(raw_image_topic, Image, queue_size=10)
+        self.yolo_bbox_sub = message_filters.Subscriber(_2d_bbox_topic, BoundingBoxes, queue_size=10)
         
         self.time_sync = message_filters.ApproximateTimeSynchronizer([self.yolo_bbox_sub, self.image_sub], 5, 0.1)
         self.time_sync.registerCallback(self.get_2d_feature)
     
         self.cv_bridge = CvBridge()
-        self.feature_2d_pub = rospy.Publisher("detection2d_with_feature", detection2d_with_feature_array, queue_size=1)
+        self.feature_2d_pub = rospy.Publisher(_2d_bbox_features_topic,
+                detection2d_with_feature_array, queue_size=1)
         self.debug_pub = rospy.Publisher("/test", Int8, queue_size=1)
         rospy.loginfo("Ready.")
         
@@ -44,7 +57,7 @@ class Appearance_Features:
         except CvBridgeError as e:
             print(e)
         input_img = torch.from_numpy(input_image).float()
-        input_img = input_img.to('cuda:1')
+        input_img = input_img.to(device)
         input_img = input_img.permute(2, 0, 1)/255
         # Generate 2D image feaures for each bounding box
         detections = []
