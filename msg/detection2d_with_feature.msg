@@ -8,6 +8,7 @@ uint64 x1 # x coordinate of the top left of the bounding box
 uint64 y1 # y coordinate of the top left of the bounding box
 uint64 x2 # x coordinate of the bottom right of the bounding box
 uint64 y2 # y coordinate of the bottom right of the bounding box
+float64 confidence # confidence of detector
 
 float64[] feature # re-ID feature
 
